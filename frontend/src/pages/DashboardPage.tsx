@@ -240,7 +240,6 @@ export const DashboardPage: React.FC = () => {
               processingId={processingId}
               onApprove={handleApprove}
               onReject={handleReject}
-              userName={user?.name || 'Admin'}
             />
           ) : (
             staffMainContent

@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { PendingUser } from '../../types';
-import Interactive3DModel from './Interactive3DModel';
 
 interface ApprovalSectionProps {
   users: PendingUser[];
@@ -9,7 +8,6 @@ interface ApprovalSectionProps {
   processingId: string | null;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
-  userName?: string;
 }
 
 const Spinner: React.FC = () => (
@@ -22,21 +20,9 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
   processingId,
   onApprove,
   onReject,
-  userName = 'Admin',
 }) => {
   return (
     <section className="relative rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl shadow-slate-950/35 backdrop-blur-sm overflow-hidden">
-      {/* 3D Model Background - Only show when no pending users */}
-      {users.length === 0 && !isLoading && (
-        <div className="absolute inset-0 opacity-80">
-          <Interactive3DModel 
-            modelPath="/model.glb"
-            userName={userName}
-            scale={1.8}
-          />
-        </div>
-      )}
-
       {/* Content Layer */}
       <div className="relative z-10 p-5 sm:p-6">
         <div className="mb-4 flex items-center justify-between">
