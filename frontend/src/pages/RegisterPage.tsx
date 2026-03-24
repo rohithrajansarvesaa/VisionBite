@@ -9,6 +9,8 @@ export const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState<'staff' | 'user'>('user');
+  const [registeredRole, setRegisteredRole] = useState<'staff' | 'user'>('user');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -50,7 +52,9 @@ export const RegisterPage: React.FC = () => {
     setLoading(true);
 
     try {
-      await register(name, email, password, confirmPassword);
+      const selectedRole = role;
+      await register(name, email, password, confirmPassword, selectedRole);
+      setRegisteredRole(selectedRole);
       setSuccess(true);
       setName('');
       setEmail('');
@@ -77,7 +81,9 @@ export const RegisterPage: React.FC = () => {
               <div className="mb-4 text-7xl">✓</div>
               <h2 className="text-2xl font-bold text-gray-900 mb-3">Registration Successful!</h2>
               <p className="text-gray-600 mb-4">
-                Your account has been created and is pending admin approval.
+                {registeredRole === 'staff'
+                  ? 'Your staff account has been created and is pending admin approval.'
+                  : 'Your user account has been created successfully.'}
               </p>
               <p className="text-sm text-gray-500 mb-6">
                 Redirecting to login in a few seconds...
@@ -111,7 +117,7 @@ export const RegisterPage: React.FC = () => {
           </div>
 
           <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Create Account</h2>
-          <p className="text-center text-gray-600 mb-6">Register as staff member</p>
+          <p className="text-center text-gray-600 mb-6">Register as customer user or staff member</p>
 
           {error && (
             <div className="mb-4 p-4 rounded-xl bg-red-50 border-2 border-red-300 text-red-800">
@@ -120,6 +126,21 @@ export const RegisterPage: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="role" className="block text-gray-700 font-semibold mb-2">
+                Account Type
+              </label>
+              <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value as 'staff' | 'user')}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200 transition"
+              >
+                <option value="user">User (Menu + Place Orders)</option>
+                <option value="staff">Staff (Needs Admin Approval)</option>
+              </select>
+            </div>
+
             <div>
               <label htmlFor="name" className="block text-gray-700 font-semibold mb-2">
                 Full Name

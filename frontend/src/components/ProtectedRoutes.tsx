@@ -29,3 +29,31 @@ export const AdminRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   return <>{children}</>;
 };
+
+export const StaffRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { isAuthenticated, role } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (role === 'user') {
+    return <Navigate to="/menu" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+export const UserOnlyRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { isAuthenticated, role } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (role !== 'user') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};

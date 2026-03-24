@@ -19,8 +19,13 @@ api.interceptors.request.use((config) => {
 });
 
 export const authService = {
-  register: (name: string, email: string, password: string, confirmPassword: string) =>
-    api.post('/auth/register', { name, email, password, confirmPassword }),
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    confirmPassword: string,
+    role: 'staff' | 'user' = 'staff'
+  ) => api.post('/auth/register', { name, email, password, confirmPassword, role }),
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
   getCurrentUser: () => api.get('/auth/me'),
@@ -38,6 +43,8 @@ export const customerService = {
   getAllCustomers: () => api.get('/customers'),
   recognizeCustomer: (faceDescriptor: number[]) => 
     api.post('/customers/recognize', { faceDescriptor }),
+  recognizeCustomersBatch: (faceDescriptors: number[][]) =>
+    api.post('/customers/recognize-group', { faceDescriptors }),
   getRecommendations: (customerId: string, mood: string) =>
     api.post('/customers/recommendations', { customerId, mood }),
   updateCustomer: (id: string, data: any) => api.put(`/customers/${id}`, data),
@@ -54,6 +61,7 @@ export const foodService = {
 export const orderService = {
   createOrder: (data: any) => api.post('/orders', data),
   getAllOrders: (params?: any) => api.get('/orders', { params }),
+  getMoodInsights: (emotion: string) => api.get('/orders/mood-insights', { params: { emotion } }),
   getOrderById: (id: string) => api.get(`/orders/${id}`),
   updateOrderStatus: (id: string, status: string) =>
     api.put(`/orders/${id}/status`, { status }),

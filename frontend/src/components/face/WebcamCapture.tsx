@@ -13,15 +13,20 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [detectedEmotion, setDetectedEmotion] = useState<string>('');
   const [faceDetected, setFaceDetected] = useState(false);
   const animationRef = useRef<number>();
+  const isDetectingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const stableFaceFramesRef = useRef(0);
 
   useEffect(() => {
     initializeCamera();
     return () => {
+      isMountedRef.current = false;
       cleanup();
     };
   }, []);
@@ -38,6 +43,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
       if (videoRef.current) {
         const mediaStream = await startWebcam(videoRef.current);
         setStream(mediaStream);
+        streamRef.current = mediaStream;
         setIsLoading(false);
         
         // Start face detection loop
@@ -51,11 +57,24 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
 
   const startFaceDetection = () => {
     const detectFrame = async () => {
+      if (isDetectingRef.current || !isMountedRef.current) {
+        animationRef.current = requestAnimationFrame(detectFrame);
+        return;
+      }
+
       if (videoRef.current && videoRef.current.readyState === 4) {
-        const detection = await detectFaceWithExpression(videoRef.current);
+        isDetectingRef.current = true;
+        const detection = await detectFaceWithExpression(videoRef.current, { highAccuracy: false });
         
         if (detection) {
-          setFaceDetected(true);
+          const detectionScore = detection.detection?.score ?? 0;
+          if (detectionScore > 0.6) {
+            stableFaceFramesRef.current += 1;
+          } else {
+            stableFaceFramesRef.current = 0;
+          }
+
+          setFaceDetected(stableFaceFramesRef.current >= 3);
           const emotion = getDominantEmotion(detection.expressions);
           setDetectedEmotion(emotion);
           
@@ -75,9 +94,19 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
             }
           }
         } else {
+          stableFaceFramesRef.current = 0;
           setFaceDetected(false);
           setDetectedEmotion('');
+
+          if (canvasRef.current) {
+            const ctx = canvasRef.current.getContext('2d');
+            if (ctx) {
+              ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            }
+          }
         }
+
+        isDetectingRef.current = false;
       }
       
       animationRef.current = requestAnimationFrame(detectFrame);
@@ -93,15 +122,40 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
     }
 
     try {
-      const detection = await detectFaceWithExpression(videoRef.current);
-      
-      if (!detection) {
+      const descriptors: number[][] = [];
+      const emotions: string[] = [];
+
+      // Capture multiple frames and average descriptors to reduce one-frame noise.
+      for (let i = 0; i < 5; i += 1) {
+        const detection = await detectFaceWithExpression(videoRef.current, { highAccuracy: true });
+        if (detection?.descriptor) {
+          descriptors.push(Array.from(detection.descriptor));
+          emotions.push(getDominantEmotion(detection.expressions));
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 120));
+      }
+
+      if (descriptors.length < 3) {
         setError('No face detected. Please try again.');
         return;
       }
 
-      const descriptor = Array.from(detection.descriptor);
-      const emotion = getDominantEmotion(detection.expressions);
+      const descriptorLength = descriptors[0].length;
+      const descriptor = Array.from({ length: descriptorLength }, (_, index) => {
+        let sum = 0;
+        for (const sample of descriptors) {
+          sum += sample[index];
+        }
+        return sum / descriptors.length;
+      });
+
+      const emotionCount = emotions.reduce<Record<string, number>>((acc, emotion) => {
+        acc[emotion] = (acc[emotion] ?? 0) + 1;
+        return acc;
+      }, {});
+
+      const emotion = Object.entries(emotionCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'neutral';
       
       onCapture(descriptor, emotion);
     } catch (err: any) {
@@ -113,7 +167,8 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
-    stopWebcam(stream);
+    stopWebcam(streamRef.current || stream);
+    streamRef.current = null;
   };
 
   return (

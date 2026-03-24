@@ -41,10 +41,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     name: string,
     email: string,
     password: string,
-    confirmPassword: string
+    confirmPassword: string,
+    role: 'staff' | 'user' = 'staff'
   ) => {
     try {
-      await authService.register(name, email, password, confirmPassword);
+      await authService.register(name, email, password, confirmPassword, role);
       // Don't auto-login after registration
     } catch (error: any) {
       const message = error.response?.data?.message || 'Registration failed';

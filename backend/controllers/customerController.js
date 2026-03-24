@@ -2,6 +2,30 @@ import Customer from '../models/Customer.js';
 import Order from '../models/Order.js';
 import FoodItem from '../models/FoodItem.js';
 
+const FACE_RECOGNITION_THRESHOLD = Number(process.env.FACE_RECOGNITION_THRESHOLD ?? 0.58);
+
+const getBestCustomerMatch = (incomingDescriptor, customers) => {
+  let bestMatch = null;
+  let minDistance = Infinity;
+
+  for (const customer of customers) {
+    const distance = euclideanDistance(incomingDescriptor, customer.faceDescriptor);
+    if (distance < minDistance) {
+      minDistance = distance;
+      bestMatch = customer;
+    }
+  }
+
+  if (!bestMatch || minDistance >= FACE_RECOGNITION_THRESHOLD) {
+    return null;
+  }
+
+  return {
+    customer: bestMatch,
+    distance: minDistance,
+  };
+};
+
 // Enroll a new customer with face descriptor
 export const enrollCustomer = async (req, res) => {
   try {
@@ -77,25 +101,16 @@ export const recognizeCustomer = async (req, res) => {
     }
 
     // Find best match using Euclidean distance
-    let bestMatch = null;
-    let minDistance = Infinity;
-    const THRESHOLD = 0.6; // Face recognition threshold
+    const bestResult = getBestCustomerMatch(faceDescriptor, customers);
 
-    for (const customer of customers) {
-      const distance = euclideanDistance(faceDescriptor, customer.faceDescriptor);
-      
-      if (distance < minDistance && distance < THRESHOLD) {
-        minDistance = distance;
-        bestMatch = customer;
-      }
-    }
-
-    if (!bestMatch) {
+    if (!bestResult) {
       return res.status(404).json({ 
         message: 'Customer not recognized',
         isNewCustomer: true 
       });
     }
+
+    const { customer: bestMatch, distance: minDistance } = bestResult;
 
     // Update last visit and visit count
     bestMatch.lastVisit = new Date();
@@ -121,10 +136,113 @@ export const recognizeCustomer = async (req, res) => {
         lastVisit: bestMatch.lastVisit,
       },
       matchConfidence: (1 - minDistance).toFixed(2),
+      matchDistance: Number(minDistance.toFixed(4)),
+      thresholdUsed: FACE_RECOGNITION_THRESHOLD,
       orderHistory: orders,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+export const recognizeCustomersBatch = async (req, res) => {
+  try {
+    const { faceDescriptors } = req.body;
+
+    if (!Array.isArray(faceDescriptors) || faceDescriptors.length === 0) {
+      return res.status(400).json({ message: 'faceDescriptors array is required' });
+    }
+
+    if (faceDescriptors.some((descriptor) => !Array.isArray(descriptor) || descriptor.length !== 128)) {
+      return res.status(400).json({ message: 'Each descriptor must contain 128 dimensions' });
+    }
+
+    const customers = await Customer.find();
+    if (customers.length === 0) {
+      return res.status(404).json({ message: 'No customers enrolled yet' });
+    }
+
+    const recognizedByCustomer = new Map();
+    const matchedDescriptorIndices = [];
+    const unmatchedDescriptorIndices = [];
+
+    for (let index = 0; index < faceDescriptors.length; index += 1) {
+      const descriptor = faceDescriptors[index];
+      const match = getBestCustomerMatch(descriptor, customers);
+      if (!match) {
+        unmatchedDescriptorIndices.push(index);
+        continue;
+      }
+
+      matchedDescriptorIndices.push(index);
+
+      const id = match.customer._id.toString();
+      const existing = recognizedByCustomer.get(id);
+      if (!existing || match.distance < existing.distance) {
+        recognizedByCustomer.set(id, {
+          ...match,
+          descriptorIndex: index,
+        });
+      }
+    }
+
+    const recognizedEntries = Array.from(recognizedByCustomer.values());
+    if (recognizedEntries.length === 0) {
+      return res.status(200).json({
+        message: 'No enrolled customers recognized',
+        recognizedCount: 0,
+        unrecognizedCount: unmatchedDescriptorIndices.length,
+        matchedDescriptorIndices,
+        unmatchedDescriptorIndices,
+        thresholdUsed: FACE_RECOGNITION_THRESHOLD,
+        results: [],
+      });
+    }
+
+    const results = [];
+    for (const entry of recognizedEntries) {
+      const customer = entry.customer;
+      const distance = entry.distance;
+
+      customer.lastVisit = new Date();
+      customer.visitCount += 1;
+      await customer.save();
+
+      const orders = await Order.find({ customer: customer._id })
+        .populate('items.foodItem')
+        .sort('-createdAt')
+        .limit(10);
+
+      results.push({
+        customer: {
+          id: customer._id,
+          name: customer.name,
+          phone: customer.phone,
+          email: customer.email,
+          preferences: customer.preferences,
+          dietaryRestrictions: customer.dietaryRestrictions,
+          visitCount: customer.visitCount,
+          lastVisit: customer.lastVisit,
+        },
+        matchConfidence: (1 - distance).toFixed(2),
+        matchDistance: Number(distance.toFixed(4)),
+        matchedDescriptorIndex: entry.descriptorIndex,
+        orderHistory: orders,
+        isNewCustomer: false,
+      });
+    }
+
+    return res.status(200).json({
+      message: `Recognized ${results.length} customer(s)`,
+      recognizedCount: results.length,
+      unrecognizedCount: unmatchedDescriptorIndices.length,
+      matchedDescriptorIndices,
+      unmatchedDescriptorIndices,
+      thresholdUsed: FACE_RECOGNITION_THRESHOLD,
+      results,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 };
 

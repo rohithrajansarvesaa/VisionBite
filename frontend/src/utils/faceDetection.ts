@@ -1,19 +1,54 @@
 import * as faceapi from 'face-api.js';
 
 let modelsLoaded = false;
+let ssdModelLoaded = false;
+let ssdLoadAttempted = false;
 
-export const loadModels = async () => {
-  if (modelsLoaded) return;
+type LoadModelOptions = {
+  preferHighAccuracy?: boolean;
+};
+
+type DetectFaceOptions = {
+  highAccuracy?: boolean;
+};
+
+const tinyDetectorOptions = new faceapi.TinyFaceDetectorOptions({
+  inputSize: 416,
+  scoreThreshold: 0.3,
+});
+
+const tinySensitiveDetectorOptions = new faceapi.TinyFaceDetectorOptions({
+  inputSize: 320,
+  scoreThreshold: 0.15,
+});
+
+export const loadModels = async (options: LoadModelOptions = {}) => {
+  const { preferHighAccuracy = false } = options;
+
+  if (modelsLoaded && (!preferHighAccuracy || ssdModelLoaded)) return;
 
   const MODEL_URL = '/models';
   
   try {
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-      faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-    ]);
+    if (!modelsLoaded) {
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+      ]);
+    }
+
+    if (preferHighAccuracy && !ssdModelLoaded && !ssdLoadAttempted) {
+      ssdLoadAttempted = true;
+      try {
+        await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+        ssdModelLoaded = true;
+      } catch {
+        // Optional model. Keep working with TinyFaceDetector when SSD files are not present.
+        ssdModelLoaded = false;
+      }
+    }
     
     modelsLoaded = true;
     console.log('✅ Face detection models loaded');
@@ -23,18 +58,94 @@ export const loadModels = async () => {
   }
 };
 
-export const detectFaceWithExpression = async (imageElement: HTMLImageElement | HTMLVideoElement) => {
+export const detectFaceWithExpression = async (
+  imageElement: HTMLImageElement | HTMLVideoElement,
+  options: DetectFaceOptions = {}
+) => {
+  const { highAccuracy = false } = options;
+
   if (!modelsLoaded) {
-    await loadModels();
+    await loadModels({ preferHighAccuracy: highAccuracy });
+  } else if (highAccuracy && !ssdModelLoaded) {
+    await loadModels({ preferHighAccuracy: true });
   }
 
-  const detection = await faceapi
-    .detectSingleFace(imageElement, new faceapi.TinyFaceDetectorOptions())
-    .withFaceLandmarks()
-    .withFaceDescriptor()
-    .withFaceExpressions();
+  const runDetect = async (
+    detector: faceapi.TinyFaceDetectorOptions | faceapi.SsdMobilenetv1Options
+  ) => {
+    return faceapi
+      .detectSingleFace(imageElement, detector)
+      .withFaceLandmarks()
+      .withFaceDescriptor()
+      .withFaceExpressions();
+  };
+
+  let detection = null;
+
+  // 1) Fast path
+  if (!highAccuracy) {
+    detection = await runDetect(tinyDetectorOptions);
+  }
+
+  // 2) More sensitive tiny detector for difficult lighting/angles
+  if (!detection) {
+    detection = await runDetect(tinySensitiveDetectorOptions);
+  }
+
+  // 3) High-accuracy SSD fallback when model is available
+  if (!detection && (highAccuracy || ssdModelLoaded)) {
+    if (!ssdModelLoaded) {
+      await loadModels({ preferHighAccuracy: true });
+    }
+    if (ssdModelLoaded) {
+      detection = await runDetect(new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 }));
+    }
+  }
 
   return detection;
+};
+
+export const detectAllFacesWithExpression = async (
+  imageElement: HTMLImageElement | HTMLVideoElement,
+  options: DetectFaceOptions = {}
+) => {
+  const { highAccuracy = false } = options;
+
+  if (!modelsLoaded) {
+    await loadModels({ preferHighAccuracy: highAccuracy });
+  } else if (highAccuracy && !ssdModelLoaded) {
+    await loadModels({ preferHighAccuracy: true });
+  }
+
+  const runDetectAll = async (
+    detector: faceapi.TinyFaceDetectorOptions | faceapi.SsdMobilenetv1Options
+  ) => {
+    return faceapi
+      .detectAllFaces(imageElement, detector)
+      .withFaceLandmarks()
+      .withFaceDescriptors()
+      .withFaceExpressions();
+  };
+
+  // 1) Fast tiny detector
+  let detections = await runDetectAll(tinyDetectorOptions);
+
+  // 2) Sensitive tiny detector fallback
+  if (detections.length === 0) {
+    detections = await runDetectAll(tinySensitiveDetectorOptions);
+  }
+
+  // 3) SSD fallback for hard scenes / backlit faces
+  if (detections.length === 0 && (highAccuracy || ssdModelLoaded)) {
+    if (!ssdModelLoaded) {
+      await loadModels({ preferHighAccuracy: true });
+    }
+    if (ssdModelLoaded) {
+      detections = await runDetectAll(new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 }));
+    }
+  }
+
+  return detections;
 };
 
 export const getDominantEmotion = (expressions: any) => {
@@ -49,7 +160,11 @@ export const getDominantEmotion = (expressions: any) => {
 export const startWebcam = async (videoElement: HTMLVideoElement): Promise<MediaStream> => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480 },
+      video: {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
       audio: false,
     });
     

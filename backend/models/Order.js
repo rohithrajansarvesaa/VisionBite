@@ -5,7 +5,10 @@ const orderSchema = new mongoose.Schema(
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Customer',
-      required: true,
+    },
+    userAccount: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
     },
     items: [
       {
@@ -49,6 +52,13 @@ const orderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+orderSchema.pre('validate', function (next) {
+  if (!this.customer && !this.userAccount) {
+    this.invalidate('customer', 'Order must belong to a customer or a user account');
+  }
+  next();
+});
 
 const Order = mongoose.model('Order', orderSchema);
 

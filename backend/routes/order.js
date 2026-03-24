@@ -5,6 +5,7 @@ import {
   getOrderById,
   updateOrderStatus,
   getCustomerOrders,
+  getUserMoodInsights,
 } from '../controllers/orderController.js';
 import { protect } from '../middleware/auth.js';
 
@@ -15,8 +16,9 @@ router.use(protect);
 
 router.post('/', createOrder);
 router.get('/', getAllOrders);
+router.get('/customer/:customerId', getCustomerOrders);
+router.get('/mood-insights', getUserMoodInsights);
 router.get('/:id', getOrderById);
 router.put('/:id/status', updateOrderStatus);
-router.get('/customer/:customerId', getCustomerOrders);
 
 export default router;

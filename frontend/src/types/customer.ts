@@ -46,6 +46,18 @@ export interface Order {
 export interface FaceRecognitionResult {
   customer: Customer;
   matchConfidence: string;
+  matchDistance?: number;
+  matchedDescriptorIndex?: number;
   orderHistory: Order[];
   isNewCustomer?: boolean;
+}
+
+export interface GroupFaceRecognitionResponse {
+  message: string;
+  recognizedCount: number;
+  unrecognizedCount: number;
+  matchedDescriptorIndices?: number[];
+  unmatchedDescriptorIndices?: number[];
+  thresholdUsed: number;
+  results: FaceRecognitionResult[];
 }

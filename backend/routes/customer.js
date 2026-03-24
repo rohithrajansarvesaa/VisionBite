@@ -3,6 +3,7 @@ import {
   enrollCustomer,
   getAllCustomers,
   recognizeCustomer,
+  recognizeCustomersBatch,
   getRecommendations,
   updateCustomer,
   deleteCustomer,
@@ -22,6 +23,7 @@ router.delete('/:id', deleteCustomer);
 
 // Face recognition
 router.post('/recognize', recognizeCustomer);
+router.post('/recognize-group', recognizeCustomersBatch);
 
 // Recommendations
 router.post('/recommendations', getRecommendations);

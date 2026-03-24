@@ -202,7 +202,12 @@ export const DashboardPage: React.FC = () => {
 
   const sidePanel = (
     <>
-      <ProfileCard name={user?.name} email={user?.email} role={user?.role || 'staff'} isApproved={user?.isApproved} />
+      <ProfileCard
+        name={user?.name}
+        email={user?.email}
+        role={isAdmin ? 'admin' : 'staff'}
+        isApproved={user?.isApproved}
+      />
 
       <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl shadow-slate-950/35 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Quick Actions</h2>

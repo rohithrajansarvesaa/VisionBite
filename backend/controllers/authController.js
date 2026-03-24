@@ -13,7 +13,7 @@ const generateToken = (id, role) => {
 // Register Staff
 export const register = async (req, res) => {
   try {
-    const { name, email, password, confirmPassword } = req.body;
+    const { name, email, password, confirmPassword, role } = req.body;
 
     // Validation
     if (!name || !email || !password || !confirmPassword) {
@@ -30,17 +30,22 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
-    // Create user (staff by default, not approved)
+    const requestedRole = role === 'user' ? 'user' : 'staff';
+
+    // Create user. Staff requires admin approval; user is auto-approved.
     const user = await User.create({
       name,
       email,
       password,
-      role: 'staff',
-      isApproved: false,
+      role: requestedRole,
+      isApproved: requestedRole === 'staff' ? false : true,
     });
 
     res.status(201).json({
-      message: 'Registration submitted. Awaiting admin approval.',
+      message:
+        requestedRole === 'staff'
+          ? 'Registration submitted. Awaiting admin approval.'
+          : 'User account created successfully.',
       user: {
         id: user._id,
         name: user.name,

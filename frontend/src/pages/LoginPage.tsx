@@ -50,7 +50,13 @@ export const LoginPage: React.FC = () => {
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      const savedUser = localStorage.getItem('user');
+      const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+      if (parsedUser?.role === 'user') {
+        navigate('/menu');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       if (err.message?.includes('pending admin approval')) {
         setError(err.message);
@@ -141,7 +147,7 @@ export const LoginPage: React.FC = () => {
             <p className="text-center text-gray-600">
               Don't have an account?{' '}
               <Link to="/register" className="text-indigo-600 font-semibold hover:text-indigo-700 transition">
-                Register here
+                Register here (User/Staff)
               </Link>
             </p>
           </div>

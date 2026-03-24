@@ -1,11 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import { PrivateRoute } from './components/ProtectedRoutes';
+import { PrivateRoute, StaffRoute, UserOnlyRoute } from './components/ProtectedRoutes';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import VisionBitePage from './pages/VisionBitePage';
+import UserMenuPage from './pages/UserMenuPage';
 import './index.css';
 
 export const App: React.FC = () => {
@@ -19,9 +20,17 @@ export const App: React.FC = () => {
           <Route
             path="/dashboard"
             element={
-              <PrivateRoute>
+              <StaffRoute>
                 <DashboardPage />
-              </PrivateRoute>
+              </StaffRoute>
+            }
+          />
+          <Route
+            path="/menu"
+            element={
+              <UserOnlyRoute>
+                <UserMenuPage />
+              </UserOnlyRoute>
             }
           />
                     <Route

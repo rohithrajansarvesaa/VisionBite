@@ -3,7 +3,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'staff';
+  role: 'admin' | 'staff' | 'user';
   isApproved: boolean;
 }
 
@@ -11,11 +11,17 @@ export interface User {
 export interface AuthContextType {
   user: User | null;
   token: string | null;
-  role: 'admin' | 'staff' | null;
+  role: 'admin' | 'staff' | 'user' | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, confirmPassword: string) => Promise<void>;
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    confirmPassword: string,
+    role?: 'staff' | 'user'
+  ) => Promise<void>;
   logout: () => void;
 }
 
