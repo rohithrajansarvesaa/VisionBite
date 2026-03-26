@@ -11,10 +11,11 @@ import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// All routes require authentication
-router.use(protect);
-
+// Public order creation (requires customerId)
 router.post('/', createOrder);
+
+// All other routes require authentication
+router.use(protect);
 router.get('/', getAllOrders);
 router.get('/customer/:customerId', getCustomerOrders);
 router.get('/mood-insights', getUserMoodInsights);

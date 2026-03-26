@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
 
 const customerSchema = new mongoose.Schema(
   {
@@ -22,12 +21,6 @@ const customerSchema = new mongoose.Schema(
         /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
         'Please provide a valid email',
       ],
-    },
-    password: {
-      type: String,
-      required: [true, 'Please provide password'],
-      minlength: 6,
-      select: false,
     },
     faceDescriptor: {
       type: [Number],
@@ -61,16 +54,6 @@ const customerSchema = new mongoose.Schema(
 // Index for faster searching
 customerSchema.index({ name: 'text' });
 
-customerSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
-    next();
-    return;
-  }
-
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
 
 const Customer = mongoose.model('Customer', customerSchema);
 

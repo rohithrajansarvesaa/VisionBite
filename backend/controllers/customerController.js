@@ -29,16 +29,12 @@ const getBestCustomerMatch = (incomingDescriptor, customers) => {
 // Enroll a new customer with face descriptor
 export const enrollCustomer = async (req, res) => {
   try {
-    const { name, phone, email, password, faceDescriptor, preferences, dietaryRestrictions } = req.body;
+    const { name, phone, email, faceDescriptor, preferences, dietaryRestrictions } = req.body;
 
-    if (!name || !phone || !email || !password || !faceDescriptor || faceDescriptor.length !== 128) {
+    if (!name || !phone || !email || !faceDescriptor || faceDescriptor.length !== 128) {
       return res.status(400).json({ 
-        message: 'Name, phone, email, password and valid face descriptor (128 dimensions) are required' 
+        message: 'Name, phone, email and valid face descriptor (128 dimensions) are required' 
       });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
     }
 
     // Check if customer already exists by name
@@ -51,7 +47,6 @@ export const enrollCustomer = async (req, res) => {
       name,
       phone,
       email,
-      password,
       faceDescriptor,
       preferences: preferences || [],
       dietaryRestrictions: dietaryRestrictions || [],

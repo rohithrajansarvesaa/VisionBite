@@ -14,22 +14,19 @@ import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// All routes require authentication
-router.use(protect);
-
-// Customer enrollment and management
-router.post('/enroll', enrollCustomer);
-router.get('/', getAllCustomers);
-router.put('/:id', updateCustomer);
-router.delete('/:id', deleteCustomer);
-
-// Face recognition
+// Public customer recognition
 router.post('/recognize', recognizeCustomer);
 router.post('/recognize-group', recognizeCustomersBatch);
 router.post('/match', matchCustomer);
 router.post('/match-group', matchCustomersBatch);
-
-// Recommendations
 router.post('/recommendations', getRecommendations);
+
+// All enrollment/management routes require authentication
+router.use(protect);
+
+router.post('/enroll', enrollCustomer);
+router.get('/', getAllCustomers);
+router.put('/:id', updateCustomer);
+router.delete('/:id', deleteCustomer);
 
 export default router;

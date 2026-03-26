@@ -8,6 +8,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import VisionBitePage from './pages/VisionBitePage';
 import UserMenuPage from './pages/UserMenuPage';
+import CustomerMenuPage from './pages/CustomerMenuPage';
 import './index.css';
 
 export const App: React.FC = () => {
@@ -44,6 +45,7 @@ export const App: React.FC = () => {
               </UserOnlyRoute>
             }
           />
+          <Route path="/customer" element={<CustomerMenuPage />} />
                     <Route
                       path="/visionbite"
                       element={

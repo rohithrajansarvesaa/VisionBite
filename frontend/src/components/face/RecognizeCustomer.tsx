@@ -25,7 +25,6 @@ interface UnknownFaceForm {
   name: string;
   phone: string;
   email: string;
-  password: string;
   isSaving: boolean;
 }
 
@@ -52,7 +51,6 @@ const RecognizeCustomer: React.FC = () => {
         name: '',
         phone: '',
         email: '',
-        password: '',
         isSaving: false,
       };
     }
@@ -140,18 +138,10 @@ const RecognizeCustomer: React.FC = () => {
       return;
     }
 
-    if (!form.phone.trim() || !form.email.trim() || !form.password) {
+    if (!form.phone.trim() || !form.email.trim()) {
       setMessage({
         type: 'error',
-        text: `Phone, email, and password are required for Face #${unknownFace.index + 1}`,
-      });
-      return;
-    }
-
-    if (form.password.length < 6) {
-      setMessage({
-        type: 'error',
-        text: `Password must be at least 6 characters for Face #${unknownFace.index + 1}`,
+        text: `Phone and email are required for Face #${unknownFace.index + 1}`,
       });
       return;
     }
@@ -162,7 +152,6 @@ const RecognizeCustomer: React.FC = () => {
         name: form.name.trim(),
         phone: form.phone.trim(),
         email: form.email.trim(),
-        password: form.password,
         preferences: [],
         dietaryRestrictions: [],
         faceDescriptor: unknownFace.descriptor,
@@ -347,7 +336,6 @@ const RecognizeCustomer: React.FC = () => {
                 name: '',
                 phone: '',
                 email: '',
-                password: '',
                 isSaving: false,
               };
 
@@ -380,13 +368,6 @@ const RecognizeCustomer: React.FC = () => {
                       placeholder="Email"
                       value={form.email}
                       onChange={(event) => updateUnknownForm(unknownFace.index, { email: event.target.value })}
-                      className="w-full rounded border border-amber-300/60 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 focus:border-amber-300 focus:outline-none"
-                    />
-                    <input
-                      type="password"
-                      placeholder="Password (min 6 chars)"
-                      value={form.password}
-                      onChange={(event) => updateUnknownForm(unknownFace.index, { password: event.target.value })}
                       className="w-full rounded border border-amber-300/60 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 focus:border-amber-300 focus:outline-none"
                     />
                     <button

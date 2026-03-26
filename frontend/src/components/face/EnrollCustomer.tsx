@@ -9,7 +9,6 @@ const EnrollCustomer: React.FC = () => {
     name: '',
     phone: '',
     email: '',
-    password: '',
     preferences: [] as string[],
     dietaryRestrictions: [] as string[],
   });
@@ -56,13 +55,8 @@ const EnrollCustomer: React.FC = () => {
       return;
     }
 
-    if (!formData.phone || !formData.email || !formData.password) {
-      setMessage({ type: 'error', text: 'Phone, email, and password are required' });
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+    if (!formData.phone || !formData.email) {
+      setMessage({ type: 'error', text: 'Phone and email are required' });
       return;
     }
 
@@ -85,7 +79,6 @@ const EnrollCustomer: React.FC = () => {
         name: '',
         phone: '',
         email: '',
-        password: '',
         preferences: [],
         dietaryRestrictions: [],
       });
@@ -164,20 +157,6 @@ const EnrollCustomer: React.FC = () => {
             />
           </div>
 
-          <div>
-            <label className="mb-2 block text-base font-medium text-slate-300">
-              Password *
-            </label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              className="w-full rounded-lg border border-slate-600/70 bg-slate-900/60 px-4 py-2 text-slate-100 focus:border-blue-400 focus:outline-none"
-              minLength={6}
-              required
-            />
-          </div>
         </div>
 
         {/* Food Preferences */}

@@ -10,7 +10,7 @@ import { protect, adminOnly } from '../middleware/auth.js';
 const router = express.Router();
 
 // Public route to get all food items
-router.get('/', protect, getAllFoodItems);
+router.get('/', getAllFoodItems);
 
 // Admin only routes
 router.post('/', protect, adminOnly, createFoodItem);
