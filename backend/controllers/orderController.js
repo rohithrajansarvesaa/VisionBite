@@ -17,10 +17,6 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ message: 'Customer is required for staff/admin orders' });
     }
 
-    if (isPublicOrder && !customerId) {
-      return res.status(400).json({ message: 'Customer is required for public orders' });
-    }
-
     // Verify customer exists when placing staff/admin order
     if (customerId) {
       const customer = await Customer.findById(customerId);
@@ -65,6 +61,7 @@ export const createOrder = async (req, res) => {
       detectedMood,
       notes,
       servedBy: req.user?.id,
+      source: isUserOrder ? 'user' : isPublicOrder ? 'guest' : 'staff',
     });
 
     const populatedOrder = await Order.findById(order._id)

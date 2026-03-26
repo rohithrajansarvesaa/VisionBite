@@ -11,7 +11,7 @@ import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Public order creation (requires customerId)
+// Public order creation (guest checkout supported)
 router.post('/', createOrder);
 
 // All other routes require authentication

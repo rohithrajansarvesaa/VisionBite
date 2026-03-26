@@ -47,14 +47,18 @@ const orderSchema = new mongoose.Schema(
     servedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+    },
+    source: {
+      type: String,
+      enum: ['guest', 'user', 'staff'],
+      default: 'guest',
     },
   },
   { timestamps: true }
 );
 
 orderSchema.pre('validate', function (next) {
-  if (!this.customer && !this.userAccount) {
+  if (!this.customer && !this.userAccount && this.source !== 'guest') {
     this.invalidate('customer', 'Order must belong to a customer or a user account');
   }
   next();

@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Minus, Plus, ShoppingCart, Sparkles, User } from 'lucide-react';
+import { Camera, Minus, Plus, ShoppingCart, User } from 'lucide-react';
 import { customerService, foodService, orderService } from '../services/api';
 import { FoodItem } from '../types/customer';
 import {
   detectFaceWithExpression,
-  getDominantEmotion,
   loadModels,
   startWebcam,
   stopWebcam,
@@ -30,30 +29,21 @@ type RecognizedCustomer = {
 const CUSTOMER_RECOGNITION_INTERVAL = 2200;
 
 const CustomerMenuPage: React.FC = () => {
+  const metallicCardClass =
+    'rounded-2xl border border-slate-500/35 bg-[linear-gradient(135deg,rgba(148,163,184,0.18)_0%,rgba(30,41,59,0.55)_35%,rgba(15,23,42,0.85)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(148,163,184,0.18),0_14px_30px_rgba(2,6,23,0.45)] backdrop-blur-sm';
+
   const [items, setItems] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<(typeof categories)[number]>('all');
   const [message, setMessage] = useState({ type: '', text: '' });
   const [cart, setCart] = useState<Map<string, number>>(new Map());
-  const [trackingState, setTrackingState] = useState<'initializing' | 'active' | 'blocked'>('initializing');
-  const [dominantEmotion, setDominantEmotion] = useState<string>('neutral');
-  const [emotionCounts, setEmotionCounts] = useState<Record<string, number>>({});
+  const [, setTrackingState] = useState<'initializing' | 'active' | 'blocked'>('initializing');
   const [placingOrder, setPlacingOrder] = useState(false);
   const [recognizedCustomer, setRecognizedCustomer] = useState<RecognizedCustomer | null>(null);
   const [personalizedItems, setPersonalizedItems] = useState<FoodItem[]>([]);
-  const [recognitionStatus, setRecognitionStatus] = useState('Detecting face...');
-
   const trackingVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const trackingIntervalRef = useRef<number | null>(null);
-
-  const computeDominantEmotion = (counts: Record<string, number>) => {
-    const entries = Object.entries(counts);
-    if (entries.length === 0) {
-      return 'neutral';
-    }
-    return entries.sort((a, b) => b[1] - a[1])[0][0];
-  };
 
   useEffect(() => {
     const loadMenu = async () => {
@@ -95,21 +85,8 @@ const CustomerMenuPage: React.FC = () => {
           });
 
           if (!detection) {
-            setRecognitionStatus('Face not detected');
             return;
           }
-
-          setRecognitionStatus('Face detected. Identifying...');
-
-          const emotion = getDominantEmotion(detection.expressions);
-          setEmotionCounts((current) => {
-            const next = {
-              ...current,
-              [emotion]: (current[emotion] || 0) + 1,
-            };
-            setDominantEmotion(computeDominantEmotion(next));
-            return next;
-          });
 
           if (!recognizedCustomer) {
             try {
@@ -122,13 +99,8 @@ const CustomerMenuPage: React.FC = () => {
                   preferences: data.customer.preferences || [],
                   dietaryRestrictions: data.customer.dietaryRestrictions || [],
                 });
-                setRecognitionStatus(`Welcome back, ${data.customer.name}`);
-              } else {
-                setRecognitionStatus('Customer not recognized');
               }
-            } catch {
-              setRecognitionStatus('Customer not recognized');
-            }
+            } catch {}
           }
         }, CUSTOMER_RECOGNITION_INTERVAL);
       } catch {
@@ -210,14 +182,6 @@ const CustomerMenuPage: React.FC = () => {
       return;
     }
 
-    if (!recognizedCustomer?.id) {
-      setMessage({
-        type: 'error',
-        text: 'We could not identify you yet. Please stand in front of the camera and try again.',
-      });
-      return;
-    }
-
     try {
       setPlacingOrder(true);
       setMessage({ type: '', text: '' });
@@ -228,13 +192,15 @@ const CustomerMenuPage: React.FC = () => {
       }));
 
       await orderService.createOrder({
-        customerId: recognizedCustomer.id,
+        customerId: recognizedCustomer?.id,
         items: payloadItems,
       });
 
       setMessage({
         type: 'success',
-        text: `Order placed successfully for ${recognizedCustomer.name}.`,
+        text: recognizedCustomer?.name
+          ? `Order placed successfully for ${recognizedCustomer.name}.`
+          : 'Order placed successfully.',
       });
       setCart(new Map());
     } catch (error: any) {
@@ -250,7 +216,7 @@ const CustomerMenuPage: React.FC = () => {
       style={{ fontFamily: 'BebasNeue, sans-serif' }}
     >
       <div className="absolute inset-0 bg-black" />
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+      <div className="relative z-10 mx-auto w-full max-w-[86rem] px-4 pt-6 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl shadow-slate-950/40 backdrop-blur-sm">
           <video
             className="pointer-events-none absolute inset-0 h-full w-full object-cover"
@@ -279,8 +245,8 @@ const CustomerMenuPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-3">
-        <section className="lg:col-span-2">
+      <div className="relative z-10 mx-auto max-w-[86rem] px-4 py-6 sm:px-6 lg:px-8">
+        <section>
           {recognizedCustomer && personalizedItems.length > 0 && (
             <div className="mb-4 rounded-2xl border border-emerald-400/35 bg-transparent p-4 shadow-xl shadow-slate-950/30">
               <h2 className="text-2xl font-semibold tracking-wide text-emerald-100">
@@ -298,23 +264,76 @@ const CustomerMenuPage: React.FC = () => {
             </div>
           )}
 
-          <div className="mb-4 rounded-2xl border border-slate-700/60 bg-transparent p-4 shadow-xl shadow-slate-950/30">
-            <h2 className="text-2xl font-semibold tracking-wide text-white">Browse Menu</h2>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => setActiveCategory(category)}
-                  className={`rounded-full px-3 py-1 text-sm font-semibold transition ${
-                    activeCategory === category
-                      ? 'bg-blue-500 text-white'
-                      : 'border border-slate-700/60 bg-transparent text-slate-300 hover:bg-slate-800/40'
+          <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
+            <div className={`${metallicCardClass} p-4 lg:col-span-4`}>
+              <h2 className="text-2xl font-semibold tracking-wide text-white">Browse Menu</h2>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setActiveCategory(category)}
+                    className={`rounded-full px-3 py-1 text-sm font-semibold transition ${
+                      activeCategory === category
+                        ? 'bg-blue-500 text-white'
+                        : 'border border-slate-700/60 bg-transparent text-slate-300 hover:bg-slate-800/40'
+                    }`}
+                  >
+                    {category === 'all' ? 'All' : category.charAt(0).toUpperCase() + category.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4 lg:col-span-1">
+              <div className={`${metallicCardClass} p-4`}>
+                <h2 className="mb-3 flex items-center gap-2 text-xl font-semibold tracking-wide text-white">
+                  <ShoppingCart size={18} />
+                  Your Cart
+                </h2>
+
+                {cartItems.length === 0 ? (
+                  <p className="text-sm text-slate-400">No items selected yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {cartItems.map((row) => (
+                      <div key={row.item._id} className="flex items-center justify-between text-sm">
+                        <p className="max-w-[65%] truncate text-slate-200">{row.item.name} x {row.quantity}</p>
+                        <p className="font-semibold text-slate-100">${(row.item.price * row.quantity).toFixed(2)}</p>
+                      </div>
+                    ))}
+
+                    <div className="mt-3 border-t border-slate-700/70 pt-3">
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="font-semibold text-slate-100">Total</span>
+                        <span className="text-xl font-bold text-blue-300">${totalAmount}</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={placingOrder || cartItems.length === 0}
+                        onClick={handlePlaceOrder}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-semibold text-white hover:bg-blue-400 disabled:cursor-not-allowed disabled:bg-slate-700"
+                      >
+                        <Camera size={18} />
+                        {placingOrder ? 'Placing Order...' : 'Place Order'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {message.text && (
+                <div
+                  className={`rounded-lg border p-3 text-sm ${
+                    message.type === 'success'
+                      ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'
+                      : 'border-rose-400/40 bg-rose-500/15 text-rose-100'
                   }`}
                 >
-                  {category === 'all' ? 'All' : category.charAt(0).toUpperCase() + category.slice(1)}
-                </button>
-              ))}
+                  {message.text}
+                </div>
+              )}
             </div>
           </div>
 
@@ -323,7 +342,7 @@ const CustomerMenuPage: React.FC = () => {
               Loading menu...
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {filteredItems.map((item) => (
                 <article key={item._id} className="rounded-2xl border border-slate-700/60 bg-transparent p-4 shadow-xl shadow-slate-950/30">
                   <div className="mb-2 flex items-start justify-between gap-3">
@@ -370,103 +389,6 @@ const CustomerMenuPage: React.FC = () => {
             </div>
           )}
         </section>
-
-        <aside className="space-y-4">
-          <div className="rounded-2xl border border-slate-700/60 bg-transparent p-4 shadow-xl shadow-slate-950/30">
-            <h2 className="mb-3 flex items-center gap-2 text-xl font-semibold tracking-wide text-white">
-              <Camera size={18} />
-              Arrival Face Check
-            </h2>
-            <div className="mt-3 rounded-lg border border-slate-700/70 bg-transparent p-3 text-sm">
-              <p className="font-semibold text-slate-300">Status</p>
-              <p className="mt-1 text-slate-200">{recognitionStatus}</p>
-              <p className="mt-2 text-xs text-slate-400">
-                This camera is used only to identify you and personalize the menu.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-700/60 bg-transparent p-4 shadow-xl shadow-slate-950/30">
-            <h2 className="mb-3 flex items-center gap-2 text-xl font-semibold tracking-wide text-white">
-              <Camera size={18} />
-              Emotion Monitoring
-            </h2>
-            <div className="mt-3 rounded-lg border border-slate-700/70 bg-transparent p-3 text-sm">
-              <p className="font-semibold text-slate-300">Tracking status</p>
-              <p className="mt-1 text-slate-200">
-                {trackingState === 'active'
-                  ? 'Active (background monitoring)'
-                  : trackingState === 'initializing'
-                  ? 'Initializing camera...'
-                  : 'Blocked (camera permission denied)'}
-              </p>
-              <p className="mt-2 font-semibold text-slate-300">Dominant emotion (session)</p>
-              <p className="mt-1 text-slate-100 capitalize">{dominantEmotion}</p>
-              <p className="mt-2 text-xs text-slate-400">
-                Emotion data is stored for future personalization and does not affect the current order.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-700/60 bg-transparent p-4 shadow-xl shadow-slate-950/30">
-            <h2 className="mb-3 flex items-center gap-2 text-xl font-semibold tracking-wide text-white">
-              <ShoppingCart size={18} />
-              Your Cart
-            </h2>
-
-            {cartItems.length === 0 ? (
-              <p className="text-sm text-slate-400">No items selected yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {cartItems.map((row) => (
-                  <div key={row.item._id} className="flex items-center justify-between text-sm">
-                    <p className="max-w-[65%] truncate text-slate-200">{row.item.name} x {row.quantity}</p>
-                    <p className="font-semibold text-slate-100">${(row.item.price * row.quantity).toFixed(2)}</p>
-                  </div>
-                ))}
-
-                <div className="mt-3 border-t border-slate-700/70 pt-3">
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="font-semibold text-slate-100">Total</span>
-                    <span className="text-xl font-bold text-blue-300">${totalAmount}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={placingOrder || cartItems.length === 0}
-                    onClick={handlePlaceOrder}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-semibold text-white hover:bg-blue-400 disabled:cursor-not-allowed disabled:bg-slate-700"
-                  >
-                    <Camera size={18} />
-                    {placingOrder ? 'Placing Order...' : 'Place Order'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-slate-700/60 bg-transparent p-4 shadow-xl shadow-slate-950/30">
-            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-slate-300">
-              <Sparkles size={14} />
-              Personalized Experience
-            </h3>
-            <p className="text-sm text-slate-300">
-              We identify you on entry and keep a background emotion log for future recommendations.
-            </p>
-          </div>
-
-          {message.text && (
-            <div
-              className={`rounded-lg border p-3 text-sm ${
-                message.type === 'success'
-                  ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'
-                  : 'border-rose-400/40 bg-rose-500/15 text-rose-100'
-              }`}
-            >
-              {message.text}
-            </div>
-          )}
-        </aside>
       </div>
 
       <video ref={trackingVideoRef} className="hidden" autoPlay muted playsInline />
