@@ -1,6 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, X, Loader2 } from 'lucide-react';
 import * as faceapi from 'face-api.js';
+import { customerService } from '../../services/api';
+import { drawLabeledDetections } from '../../utils/faceOverlay';
+import { FaceMatchResponse } from '../../types/customer';
 import { loadModels, detectFaceWithExpression, getDominantEmotion, startWebcam, stopWebcam } from '../../utils/faceDetection';
 
 interface WebcamCaptureProps {
@@ -18,10 +21,14 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
   const [error, setError] = useState('');
   const [detectedEmotion, setDetectedEmotion] = useState<string>('');
   const [faceDetected, setFaceDetected] = useState(false);
+  const [detectionConfidence, setDetectionConfidence] = useState<number>(0);
+  const [detectedLabel, setDetectedLabel] = useState<string>('');
   const animationRef = useRef<number>();
   const isDetectingRef = useRef(false);
   const isMountedRef = useRef(true);
   const stableFaceFramesRef = useRef(0);
+  const lastMatchRef = useRef(0);
+  const isMatchingRef = useRef(false);
 
   useEffect(() => {
     initializeCamera();
@@ -68,15 +75,43 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
         
         if (detection) {
           const detectionScore = detection.detection?.score ?? 0;
-          if (detectionScore > 0.6) {
+          const hasLandmarks = Boolean(detection.landmarks?.positions?.length);
+
+          if (detectionScore > 0.45 || hasLandmarks) {
             stableFaceFramesRef.current += 1;
           } else {
             stableFaceFramesRef.current = 0;
           }
 
-          setFaceDetected(stableFaceFramesRef.current >= 3);
+          setFaceDetected(stableFaceFramesRef.current >= 2);
+          setDetectionConfidence(detectionScore);
           const emotion = getDominantEmotion(detection.expressions);
           setDetectedEmotion(emotion);
+
+          if (detection.descriptor) {
+            const now = Date.now();
+            if (!isMatchingRef.current && now - lastMatchRef.current > 1200) {
+              isMatchingRef.current = true;
+              lastMatchRef.current = now;
+
+              customerService
+                .matchCustomer(Array.from(detection.descriptor))
+                .then((response) => {
+                  const data = response.data as FaceMatchResponse;
+                  if (data.matched && data.customer?.name) {
+                    setDetectedLabel(data.customer.name);
+                  } else {
+                    setDetectedLabel('Unknown');
+                  }
+                })
+                .catch(() => {
+                  setDetectedLabel('Unknown');
+                })
+                .finally(() => {
+                  isMatchingRef.current = false;
+                });
+            }
+          }
           
           // Draw detection box
           if (canvasRef.current) {
@@ -86,17 +121,15 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
             };
             faceapi.matchDimensions(canvasRef.current, displaySize);
             const resizedDetection = faceapi.resizeResults(detection, displaySize);
-            
-            const ctx = canvasRef.current.getContext('2d');
-            if (ctx) {
-              ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-              faceapi.draw.drawDetections(canvasRef.current, [resizedDetection]);
-            }
+
+            drawLabeledDetections(canvasRef.current, [resizedDetection], [detectedLabel || 'Unknown']);
           }
         } else {
           stableFaceFramesRef.current = 0;
           setFaceDetected(false);
           setDetectedEmotion('');
+          setDetectionConfidence(0);
+          setDetectedLabel('');
 
           if (canvasRef.current) {
             const ctx = canvasRef.current.getContext('2d');
@@ -215,6 +248,9 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
             <div className="absolute top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg">
               <p className="text-sm font-semibold">Detected Mood</p>
               <p className="text-lg capitalize">{detectedEmotion}</p>
+              <p className="text-xs opacity-90">
+                Confidence: {Math.round(detectionConfidence * 100)}%
+              </p>
             </div>
           )}
 

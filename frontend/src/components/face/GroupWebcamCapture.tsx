@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Camera, Loader2, Users, X } from 'lucide-react';
 import * as faceapi from 'face-api.js';
+import { customerService } from '../../services/api';
+import { drawLabeledDetections } from '../../utils/faceOverlay';
+import { FaceMatchGroupResponse } from '../../types/customer';
 import {
   detectAllFacesWithExpression,
   getDominantEmotion,
@@ -26,11 +29,14 @@ const GroupWebcamCapture: React.FC<GroupWebcamCaptureProps> = ({ onCapture, onCl
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [faceCount, setFaceCount] = useState(0);
+  const [faceLabels, setFaceLabels] = useState<string[]>([]);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number>();
   const isMountedRef = useRef(true);
   const isDetectingRef = useRef(false);
+  const lastMatchRef = useRef(0);
+  const isMatchingRef = useRef(false);
 
   useEffect(() => {
     initializeCamera();
@@ -73,6 +79,7 @@ const GroupWebcamCapture: React.FC<GroupWebcamCaptureProps> = ({ onCapture, onCl
 
         const detections = await detectAllFacesWithExpression(videoRef.current, { highAccuracy: false });
         setFaceCount(detections.length);
+        maybeMatchFaces(detections);
 
         if (canvasRef.current) {
           const displaySize = {
@@ -83,11 +90,8 @@ const GroupWebcamCapture: React.FC<GroupWebcamCaptureProps> = ({ onCapture, onCl
           faceapi.matchDimensions(canvasRef.current, displaySize);
           const resized = faceapi.resizeResults(detections, displaySize);
 
-          const ctx = canvasRef.current.getContext('2d');
-          if (ctx) {
-            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-            faceapi.draw.drawDetections(canvasRef.current, resized);
-          }
+          const labels = resized.map((_, index) => faceLabels[index] || 'Unknown');
+          drawLabeledDetections(canvasRef.current, resized, labels);
         }
 
         isDetectingRef.current = false;
@@ -97,6 +101,41 @@ const GroupWebcamCapture: React.FC<GroupWebcamCaptureProps> = ({ onCapture, onCl
     };
 
     detectFrame();
+  };
+
+  const maybeMatchFaces = (detections: any[]) => {
+    if (detections.length === 0) {
+      setFaceLabels([]);
+      return;
+    }
+
+    const now = Date.now();
+    if (isMatchingRef.current || now - lastMatchRef.current < 1200) {
+      return;
+    }
+
+    isMatchingRef.current = true;
+    lastMatchRef.current = now;
+
+    customerService
+      .matchCustomersBatch(detections.map((detection) => Array.from(detection.descriptor)))
+      .then((response) => {
+        const data = response.data as FaceMatchGroupResponse;
+        const labels = detections.map((_, index) => {
+          const match = data.results.find((result) => result.index === index);
+          if (match?.matched && match.customer?.name) {
+            return match.customer.name;
+          }
+          return 'Unknown';
+        });
+        setFaceLabels(labels);
+      })
+      .catch(() => {
+        setFaceLabels(detections.map(() => 'Unknown'));
+      })
+      .finally(() => {
+        isMatchingRef.current = false;
+      });
   };
 
   const captureGroup = async () => {

@@ -150,6 +150,108 @@ export const recognizeCustomer = async (req, res) => {
   }
 };
 
+export const matchCustomer = async (req, res) => {
+  try {
+    const { faceDescriptor } = req.body;
+
+    if (!faceDescriptor || faceDescriptor.length !== 128) {
+      return res.status(400).json({ message: 'Valid face descriptor required' });
+    }
+
+    const customers = await Customer.find();
+
+    if (customers.length === 0) {
+      return res.status(200).json({
+        message: 'No customers enrolled yet',
+        matched: false,
+        thresholdUsed: FACE_RECOGNITION_THRESHOLD,
+      });
+    }
+
+    const bestResult = getBestCustomerMatch(faceDescriptor, customers);
+
+    if (!bestResult) {
+      return res.status(200).json({
+        message: 'Customer not matched',
+        matched: false,
+        thresholdUsed: FACE_RECOGNITION_THRESHOLD,
+      });
+    }
+
+    const { customer, distance } = bestResult;
+
+    return res.status(200).json({
+      message: 'Customer matched',
+      matched: true,
+      customer: {
+        id: customer._id,
+        name: customer.name,
+      },
+      matchConfidence: (1 - distance).toFixed(2),
+      matchDistance: Number(distance.toFixed(4)),
+      thresholdUsed: FACE_RECOGNITION_THRESHOLD,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const matchCustomersBatch = async (req, res) => {
+  try {
+    const { faceDescriptors } = req.body;
+
+    if (!Array.isArray(faceDescriptors) || faceDescriptors.length === 0) {
+      return res.status(400).json({ message: 'faceDescriptors array is required' });
+    }
+
+    if (faceDescriptors.some((descriptor) => !Array.isArray(descriptor) || descriptor.length !== 128)) {
+      return res.status(400).json({ message: 'Each descriptor must contain 128 dimensions' });
+    }
+
+    const customers = await Customer.find();
+
+    if (customers.length === 0) {
+      return res.status(200).json({
+        message: 'No customers enrolled yet',
+        thresholdUsed: FACE_RECOGNITION_THRESHOLD,
+        results: faceDescriptors.map((_, index) => ({
+          index,
+          matched: false,
+        })),
+      });
+    }
+
+    const results = faceDescriptors.map((descriptor, index) => {
+      const match = getBestCustomerMatch(descriptor, customers);
+      if (!match) {
+        return {
+          index,
+          matched: false,
+        };
+      }
+
+      return {
+        index,
+        matched: true,
+        customer: {
+          id: match.customer._id,
+          name: match.customer.name,
+        },
+        matchConfidence: (1 - match.distance).toFixed(2),
+        matchDistance: Number(match.distance.toFixed(4)),
+      };
+    });
+
+    return res.status(200).json({
+      message: 'Batch match complete',
+      thresholdUsed: FACE_RECOGNITION_THRESHOLD,
+      results,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 export const recognizeCustomersBatch = async (req, res) => {
   try {
     const { faceDescriptors } = req.body;

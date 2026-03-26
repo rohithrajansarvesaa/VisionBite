@@ -52,6 +52,29 @@ export interface FaceRecognitionResult {
   isNewCustomer?: boolean;
 }
 
+export interface FaceMatchResult {
+  index: number;
+  matched: boolean;
+  customer?: Pick<Customer, 'id' | 'name'>;
+  matchConfidence?: string;
+  matchDistance?: number;
+}
+
+export interface FaceMatchResponse {
+  message: string;
+  matched: boolean;
+  customer?: Pick<Customer, 'id' | 'name'>;
+  matchConfidence?: string;
+  matchDistance?: number;
+  thresholdUsed: number;
+}
+
+export interface FaceMatchGroupResponse {
+  message: string;
+  thresholdUsed: number;
+  results: FaceMatchResult[];
+}
+
 export interface GroupFaceRecognitionResponse {
   message: string;
   recognizedCount: number;

@@ -45,6 +45,10 @@ export const customerService = {
     api.post('/customers/recognize', { faceDescriptor }),
   recognizeCustomersBatch: (faceDescriptors: number[][]) =>
     api.post('/customers/recognize-group', { faceDescriptors }),
+  matchCustomer: (faceDescriptor: number[]) =>
+    api.post('/customers/match', { faceDescriptor }),
+  matchCustomersBatch: (faceDescriptors: number[][]) =>
+    api.post('/customers/match-group', { faceDescriptors }),
   getRecommendations: (customerId: string, mood: string) =>
     api.post('/customers/recommendations', { customerId, mood }),
   updateCustomer: (id: string, data: any) => api.put(`/customers/${id}`, data),

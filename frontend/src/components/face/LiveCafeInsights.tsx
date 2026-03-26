@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as faceapi from 'face-api.js';
 import { Loader2, Users, UtensilsCrossed, Smile } from 'lucide-react';
 import { customerService } from '../../services/api';
-import { FaceRecognitionResult, GroupFaceRecognitionResponse } from '../../types/customer';
+import { FaceMatchGroupResponse, FaceRecognitionResult, GroupFaceRecognitionResponse } from '../../types/customer';
+import { drawLabeledDetections } from '../../utils/faceOverlay';
 import {
   detectAllFacesWithExpression,
   getDominantEmotion,
@@ -35,6 +36,8 @@ const LiveCafeInsights: React.FC = () => {
   const isMountedRef = useRef(true);
   const isDetectingRef = useRef(false);
   const isScanningRef = useRef(false);
+  const lastMatchRef = useRef(0);
+  const isMatchingRef = useRef(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
@@ -43,6 +46,7 @@ const LiveCafeInsights: React.FC = () => {
   const [unrecognizedCount, setUnrecognizedCount] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [customers, setCustomers] = useState<LiveCustomerInsight[]>([]);
+  const [faceLabels, setFaceLabels] = useState<string[]>([]);
 
   useEffect(() => {
     initializeLiveInsights();
@@ -95,6 +99,7 @@ const LiveCafeInsights: React.FC = () => {
         try {
           const detections = await detectAllFacesWithExpression(videoRef.current, { highAccuracy: false });
           setFacesInFrame(detections.length);
+          maybeMatchFaces(detections);
 
           if (canvasRef.current) {
             const displaySize = {
@@ -105,11 +110,10 @@ const LiveCafeInsights: React.FC = () => {
             faceapi.matchDimensions(canvasRef.current, displaySize);
             const resized = faceapi.resizeResults(detections, displaySize);
 
-            const ctx = canvasRef.current.getContext('2d');
-            if (ctx) {
-              ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-              faceapi.draw.drawDetections(canvasRef.current, resized);
-            }
+            const labels = resized.map((_, index) => faceLabels[index] || 'Unknown');
+            drawLabeledDetections(canvasRef.current, resized, labels, {
+              strokeStyle: '#38bdf8',
+            });
           }
         } catch {
           // Keep preview loop resilient even if one detection attempt fails.
@@ -122,6 +126,41 @@ const LiveCafeInsights: React.FC = () => {
     };
 
     drawFrame();
+  };
+
+  const maybeMatchFaces = (detections: any[]) => {
+    if (detections.length === 0) {
+      setFaceLabels([]);
+      return;
+    }
+
+    const now = Date.now();
+    if (isMatchingRef.current || now - lastMatchRef.current < 1500) {
+      return;
+    }
+
+    isMatchingRef.current = true;
+    lastMatchRef.current = now;
+
+    customerService
+      .matchCustomersBatch(detections.map((detection) => Array.from(detection.descriptor)))
+      .then((response) => {
+        const data = response.data as FaceMatchGroupResponse;
+        const labels = detections.map((_, index) => {
+          const match = data.results.find((result) => result.index === index);
+          if (match?.matched && match.customer?.name) {
+            return match.customer.name;
+          }
+          return 'Unknown';
+        });
+        setFaceLabels(labels);
+      })
+      .catch(() => {
+        setFaceLabels(detections.map(() => 'Unknown'));
+      })
+      .finally(() => {
+        isMatchingRef.current = false;
+      });
   };
 
   const toLiveInsights = (
