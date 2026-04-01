@@ -77,24 +77,28 @@ const GroupWebcamCapture: React.FC<GroupWebcamCaptureProps> = ({ onCapture, onCl
       if (videoRef.current && videoRef.current.readyState === 4) {
         isDetectingRef.current = true;
 
-        const detections = await detectAllFacesWithExpression(videoRef.current, { highAccuracy: false });
-        setFaceCount(detections.length);
-        maybeMatchFaces(detections);
+        try {
+          const detections = await detectAllFacesWithExpression(videoRef.current, { highAccuracy: true });
+          setFaceCount(detections.length);
+          maybeMatchFaces(detections);
 
-        if (canvasRef.current) {
-          const displaySize = {
-            width: videoRef.current.videoWidth,
-            height: videoRef.current.videoHeight,
-          };
+          if (canvasRef.current) {
+            const displaySize = {
+              width: videoRef.current.videoWidth,
+              height: videoRef.current.videoHeight,
+            };
 
-          faceapi.matchDimensions(canvasRef.current, displaySize);
-          const resized = faceapi.resizeResults(detections, displaySize);
+            faceapi.matchDimensions(canvasRef.current, displaySize);
+            const resized = faceapi.resizeResults(detections, displaySize);
 
-          const labels = resized.map((_, index) => faceLabels[index] || 'Unknown');
-          drawLabeledDetections(canvasRef.current, resized, labels);
+            const labels = resized.map((_, index) => faceLabels[index] || 'Unknown');
+            drawLabeledDetections(canvasRef.current, resized, labels);
+          }
+        } catch {
+          setError('Live face detection failed. Please keep faces centered and try again.');
+        } finally {
+          isDetectingRef.current = false;
         }
-
-        isDetectingRef.current = false;
       }
 
       animationRef.current = requestAnimationFrame(detectFrame);

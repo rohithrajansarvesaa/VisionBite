@@ -183,13 +183,13 @@ export const DashboardPage: React.FC = () => {
 
   const staffMainContent = (
     <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl shadow-slate-950/35 backdrop-blur-sm sm:p-6">
-      <h2 className="text-lg font-semibold text-white">Account Overview</h2>
-      <p className="mt-2 text-sm text-slate-300">
+      <h2 className="text-lg font-semibold tracking-[0.05em] text-white">Account Overview</h2>
+      <p className="mt-2 text-sm tracking-[0.04em] text-slate-300">
         {user?.isApproved
           ? 'Your staff account is approved and fully active.'
           : 'Your registration is pending admin approval. You will receive access after verification.'}
       </p>
-      <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/40 p-4 text-sm text-slate-300">
+      <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/40 p-4 text-sm tracking-[0.04em] text-slate-300">
         Keep your profile information up to date and contact an administrator if approval takes longer than expected.
       </div>
     </section>
@@ -205,20 +205,20 @@ export const DashboardPage: React.FC = () => {
       />
 
       <section className="rounded-2xl border border-slate-500/30 bg-transparent p-5 shadow-xl shadow-slate-950/10">
-        <h2 className="text-2xl font-semibold text-white">Quick Actions</h2>
+        <h2 className="text-2xl font-semibold tracking-[0.05em] text-white">Quick Actions</h2>
         <div className="mt-4 space-y-2">
           <button
             type="button"
             onClick={fetchDashboardData}
             disabled={!isAdmin || isLoadingStats}
-            className="w-full rounded-xl bg-blue-600 px-4 py-3 text-xl font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-xl bg-blue-600 px-4 py-3 text-xl font-semibold tracking-[0.045em] text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoadingStats && isAdmin ? 'Refreshing...' : 'Refresh Dashboard'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/login')}
-            className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xl font-semibold text-slate-200 transition hover:bg-slate-700"
+            className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xl font-semibold tracking-[0.045em] text-slate-200 transition hover:bg-slate-700"
           >
             Go to Login
           </button>

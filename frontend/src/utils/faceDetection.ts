@@ -14,12 +14,12 @@ type DetectFaceOptions = {
 
 const tinyDetectorOptions = new faceapi.TinyFaceDetectorOptions({
   inputSize: 416,
-  scoreThreshold: 0.3,
+  scoreThreshold: 0.2,
 });
 
 const tinySensitiveDetectorOptions = new faceapi.TinyFaceDetectorOptions({
-  inputSize: 320,
-  scoreThreshold: 0.15,
+  inputSize: 512,
+  scoreThreshold: 0.1,
 });
 
 export const loadModels = async (options: LoadModelOptions = {}) => {
@@ -27,7 +27,8 @@ export const loadModels = async (options: LoadModelOptions = {}) => {
 
   if (modelsLoaded && (!preferHighAccuracy || ssdModelLoaded)) return;
 
-  const MODEL_URL = '/models';
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  const MODEL_URL = `${baseUrl.replace(/\/$/, '')}/models`;
   
   try {
     if (!modelsLoaded) {
@@ -127,25 +128,50 @@ export const detectAllFacesWithExpression = async (
       .withFaceExpressions();
   };
 
+  const filterReliableDetections = (
+    detections: faceapi.WithFaceExpressions<faceapi.WithFaceDescriptor<faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }, faceapi.FaceLandmarks68>>>[]
+  ) => {
+    const frameWidth = imageElement.width || (imageElement as HTMLVideoElement).videoWidth || 1;
+    const frameHeight = imageElement.height || (imageElement as HTMLVideoElement).videoHeight || 1;
+    const frameArea = frameWidth * frameHeight;
+
+    return detections.filter((result) => {
+      const score = result.detection?.score ?? 0;
+      const box = result.detection?.box;
+      const boxArea = box ? box.width * box.height : 0;
+      const areaRatio = frameArea > 0 ? boxArea / frameArea : 0;
+
+      // Remove noisy detections (tiny/low-confidence regions) that cause false face counts.
+      return score >= 0.2 && areaRatio >= 0.015;
+    });
+  };
+
+  const pickLargerSet = (
+    current: faceapi.WithFaceExpressions<faceapi.WithFaceDescriptor<faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }, faceapi.FaceLandmarks68>>>[],
+    candidate: faceapi.WithFaceExpressions<faceapi.WithFaceDescriptor<faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }, faceapi.FaceLandmarks68>>>[]
+  ) => {
+    return candidate.length > current.length ? candidate : current;
+  };
+
   // 1) Fast tiny detector
   let detections = await runDetectAll(tinyDetectorOptions);
 
-  // 2) Sensitive tiny detector fallback
-  if (detections.length === 0) {
-    detections = await runDetectAll(tinySensitiveDetectorOptions);
-  }
+  // 2) Sensitive tiny detector can detect smaller/fainter faces; keep whichever finds more
+  const sensitiveDetections = await runDetectAll(tinySensitiveDetectorOptions);
+  detections = pickLargerSet(detections, sensitiveDetections);
 
-  // 3) SSD fallback for hard scenes / backlit faces
-  if (detections.length === 0 && (highAccuracy || ssdModelLoaded)) {
+  // 3) SSD can perform better for harder scenes; compare and keep higher face count
+  if (highAccuracy || ssdModelLoaded || detections.length <= 1) {
     if (!ssdModelLoaded) {
       await loadModels({ preferHighAccuracy: true });
     }
     if (ssdModelLoaded) {
-      detections = await runDetectAll(new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 }));
+      const ssdDetections = await runDetectAll(new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 }));
+      detections = pickLargerSet(detections, ssdDetections);
     }
   }
 
-  return detections;
+  return filterReliableDetections(detections);
 };
 
 export const getDominantEmotion = (expressions: any) => {
@@ -167,14 +193,24 @@ export const startWebcam = async (videoElement: HTMLVideoElement): Promise<Media
       },
       audio: false,
     });
-    
-    videoElement.srcObject = stream;
-    
-    return new Promise((resolve) => {
-      videoElement.onloadedmetadata = () => {
-        videoElement.play();
-        resolve(stream);
+
+    return new Promise((resolve, reject) => {
+      const handleLoadedMetadata = async () => {
+        videoElement.onloadedmetadata = null;
+        try {
+          await videoElement.play();
+          resolve(stream);
+        } catch {
+          reject(new Error('Camera stream started, but video playback was blocked.'));
+        }
       };
+
+      videoElement.onloadedmetadata = handleLoadedMetadata;
+      videoElement.srcObject = stream;
+
+      if (videoElement.readyState >= 1) {
+        void handleLoadedMetadata();
+      }
     });
   } catch (error) {
     console.error('Error accessing webcam:', error);

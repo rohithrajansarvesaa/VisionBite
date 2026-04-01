@@ -25,7 +25,7 @@ interface LiveCustomerInsight {
   latestFood: string;
 }
 
-const AUTO_SCAN_INTERVAL_MS = 8000;
+const AUTO_SCAN_INTERVAL_MS = 2500;
 
 const LiveCafeInsights: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -38,15 +38,26 @@ const LiveCafeInsights: React.FC = () => {
   const isScanningRef = useRef(false);
   const lastMatchRef = useRef(0);
   const isMatchingRef = useRef(false);
+  const faceLabelsRef = useRef<string[]>([]);
+  const isLoadingRef = useRef(true);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
   const [error, setError] = useState('');
   const [facesInFrame, setFacesInFrame] = useState(0);
+  const [recognizedFaceCount, setRecognizedFaceCount] = useState(0);
   const [unrecognizedCount, setUnrecognizedCount] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [customers, setCustomers] = useState<LiveCustomerInsight[]>([]);
   const [faceLabels, setFaceLabels] = useState<string[]>([]);
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
+
+  useEffect(() => {
+    faceLabelsRef.current = faceLabels;
+  }, [faceLabels]);
 
   useEffect(() => {
     initializeLiveInsights();
@@ -110,7 +121,7 @@ const LiveCafeInsights: React.FC = () => {
             faceapi.matchDimensions(canvasRef.current, displaySize);
             const resized = faceapi.resizeResults(detections, displaySize);
 
-            const labels = resized.map((_, index) => faceLabels[index] || 'Unknown');
+            const labels = resized.map((_, index) => faceLabelsRef.current[index] || 'Unknown');
             drawLabeledDetections(canvasRef.current, resized, labels, {
               strokeStyle: '#38bdf8',
             });
@@ -193,9 +204,11 @@ const LiveCafeInsights: React.FC = () => {
   };
 
   const triggerScan = async () => {
-    if (!videoRef.current || isScanningRef.current || isLoading) {
+    if (!videoRef.current || isScanningRef.current || isLoadingRef.current || videoRef.current.readyState < 2) {
       return;
     }
+
+    let capturedFaceCount = 0;
 
     try {
       isScanningRef.current = true;
@@ -206,11 +219,13 @@ const LiveCafeInsights: React.FC = () => {
         descriptor: Array.from(detection.descriptor),
         emotion: getDominantEmotion(detection.expressions),
       }));
+      capturedFaceCount = capturedFaces.length;
 
       setFacesInFrame(capturedFaces.length);
 
       if (capturedFaces.length === 0) {
         setCustomers([]);
+        setRecognizedFaceCount(0);
         setUnrecognizedCount(0);
         setLastUpdated(new Date());
         return;
@@ -221,11 +236,45 @@ const LiveCafeInsights: React.FC = () => {
       );
       const data = response.data as GroupFaceRecognitionResponse;
 
+      const unmatchedIndices = Array.isArray(data.unmatchedDescriptorIndices)
+        ? data.unmatchedDescriptorIndices
+        : [];
+
+      const uniqueUnmatchedIndices = new Set(
+        unmatchedIndices.filter(
+          (index): index is number =>
+            typeof index === 'number' &&
+            index >= 0 &&
+            index < capturedFaces.length
+        )
+      );
+
+      let unrecognizedFaces = uniqueUnmatchedIndices.size;
+      if (unrecognizedFaces === 0 && typeof data.unrecognizedCount === 'number') {
+        unrecognizedFaces = Math.min(Math.max(data.unrecognizedCount, 0), capturedFaces.length);
+      }
+
+      const recognizedFaces = capturedFaces.length - unrecognizedFaces;
+
       setCustomers(toLiveInsights(data.results || [], capturedFaces));
-      setUnrecognizedCount(data.unrecognizedCount || 0);
+      setRecognizedFaceCount(recognizedFaces);
+      setUnrecognizedCount(unrecognizedFaces);
       setLastUpdated(new Date());
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to analyze current cafe activity');
+      const apiMessage = err?.response?.data?.message;
+
+      // Keep dashboard useful even when recognition API is temporarily unavailable.
+      if (apiMessage === 'No customers enrolled yet') {
+        setCustomers([]);
+        setRecognizedFaceCount(0);
+        setUnrecognizedCount(capturedFaceCount);
+        setError('No enrolled customers found. Enroll customers to start recognition.');
+      } else {
+        setCustomers([]);
+        setRecognizedFaceCount(0);
+        setUnrecognizedCount(capturedFaceCount);
+        setError(apiMessage || 'Failed to analyze current cafe activity');
+      }
       setLastUpdated(new Date());
     } finally {
       isScanningRef.current = false;
@@ -288,7 +337,7 @@ const LiveCafeInsights: React.FC = () => {
         </article>
         <article className="rounded-xl border border-slate-500/30 bg-transparent p-4 shadow-xl shadow-slate-950/10">
           <p className="text-base text-slate-400">Recognized customers</p>
-          <p className="mt-1 text-4xl font-bold text-white">{customers.length}</p>
+          <p className="mt-1 text-4xl font-bold text-white">{recognizedFaceCount}</p>
         </article>
         <article className="rounded-xl border border-slate-500/30 bg-transparent p-4 shadow-xl shadow-slate-950/10">
           <p className="text-base text-slate-400">Unrecognized faces</p>

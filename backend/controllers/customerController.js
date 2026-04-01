@@ -2,7 +2,15 @@ import Customer from '../models/Customer.js';
 import Order from '../models/Order.js';
 import FoodItem from '../models/FoodItem.js';
 
-const FACE_RECOGNITION_THRESHOLD = Number(process.env.FACE_RECOGNITION_THRESHOLD ?? 0.58);
+const configuredThreshold = Number(process.env.FACE_RECOGNITION_THRESHOLD);
+const FACE_RECOGNITION_THRESHOLD = Number.isFinite(configuredThreshold)
+  ? Math.min(Math.max(configuredThreshold, 0.35), 0.65)
+  : 0.52;
+
+const configuredMinConfidence = Number(process.env.FACE_MATCH_MIN_CONFIDENCE);
+const FACE_MATCH_MIN_CONFIDENCE = Number.isFinite(configuredMinConfidence)
+  ? Math.min(Math.max(configuredMinConfidence, 0.4), 0.85)
+  : 0.55;
 
 const getBestCustomerMatch = (incomingDescriptor, customers) => {
   let bestMatch = null;
@@ -17,6 +25,11 @@ const getBestCustomerMatch = (incomingDescriptor, customers) => {
   }
 
   if (!bestMatch || minDistance >= FACE_RECOGNITION_THRESHOLD) {
+    return null;
+  }
+
+  const matchConfidence = 1 - minDistance;
+  if (matchConfidence < FACE_MATCH_MIN_CONFIDENCE) {
     return null;
   }
 

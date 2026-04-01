@@ -71,75 +71,80 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
 
       if (videoRef.current && videoRef.current.readyState === 4) {
         isDetectingRef.current = true;
-        const detection = await detectFaceWithExpression(videoRef.current, { highAccuracy: false });
-        
-        if (detection) {
-          const detectionScore = detection.detection?.score ?? 0;
-          const hasLandmarks = Boolean(detection.landmarks?.positions?.length);
 
-          if (detectionScore > 0.45 || hasLandmarks) {
-            stableFaceFramesRef.current += 1;
+        try {
+          const detection = await detectFaceWithExpression(videoRef.current, { highAccuracy: false });
+
+          if (detection) {
+            const detectionScore = detection.detection?.score ?? 0;
+            const hasLandmarks = Boolean(detection.landmarks?.positions?.length);
+
+            if (detectionScore > 0.2 || hasLandmarks) {
+              stableFaceFramesRef.current += 1;
+            } else {
+              stableFaceFramesRef.current = 0;
+            }
+
+            setFaceDetected(stableFaceFramesRef.current >= 1);
+            setDetectionConfidence(detectionScore);
+            const emotion = getDominantEmotion(detection.expressions);
+            setDetectedEmotion(emotion);
+
+            if (detection.descriptor) {
+              const now = Date.now();
+              if (!isMatchingRef.current && now - lastMatchRef.current > 1200) {
+                isMatchingRef.current = true;
+                lastMatchRef.current = now;
+
+                customerService
+                  .matchCustomer(Array.from(detection.descriptor))
+                  .then((response) => {
+                    const data = response.data as FaceMatchResponse;
+                    if (data.matched && data.customer?.name) {
+                      setDetectedLabel(data.customer.name);
+                    } else {
+                      setDetectedLabel('Unknown');
+                    }
+                  })
+                  .catch(() => {
+                    setDetectedLabel('Unknown');
+                  })
+                  .finally(() => {
+                    isMatchingRef.current = false;
+                  });
+              }
+            }
+
+            // Draw detection box
+            if (canvasRef.current) {
+              const displaySize = {
+                width: videoRef.current.videoWidth,
+                height: videoRef.current.videoHeight,
+              };
+              faceapi.matchDimensions(canvasRef.current, displaySize);
+              const resizedDetection = faceapi.resizeResults(detection, displaySize);
+
+              drawLabeledDetections(canvasRef.current, [resizedDetection], [detectedLabel || 'Unknown']);
+            }
           } else {
             stableFaceFramesRef.current = 0;
-          }
+            setFaceDetected(false);
+            setDetectedEmotion('');
+            setDetectionConfidence(0);
+            setDetectedLabel('');
 
-          setFaceDetected(stableFaceFramesRef.current >= 2);
-          setDetectionConfidence(detectionScore);
-          const emotion = getDominantEmotion(detection.expressions);
-          setDetectedEmotion(emotion);
-
-          if (detection.descriptor) {
-            const now = Date.now();
-            if (!isMatchingRef.current && now - lastMatchRef.current > 1200) {
-              isMatchingRef.current = true;
-              lastMatchRef.current = now;
-
-              customerService
-                .matchCustomer(Array.from(detection.descriptor))
-                .then((response) => {
-                  const data = response.data as FaceMatchResponse;
-                  if (data.matched && data.customer?.name) {
-                    setDetectedLabel(data.customer.name);
-                  } else {
-                    setDetectedLabel('Unknown');
-                  }
-                })
-                .catch(() => {
-                  setDetectedLabel('Unknown');
-                })
-                .finally(() => {
-                  isMatchingRef.current = false;
-                });
+            if (canvasRef.current) {
+              const ctx = canvasRef.current.getContext('2d');
+              if (ctx) {
+                ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+              }
             }
           }
-          
-          // Draw detection box
-          if (canvasRef.current) {
-            const displaySize = {
-              width: videoRef.current.videoWidth,
-              height: videoRef.current.videoHeight,
-            };
-            faceapi.matchDimensions(canvasRef.current, displaySize);
-            const resizedDetection = faceapi.resizeResults(detection, displaySize);
-
-            drawLabeledDetections(canvasRef.current, [resizedDetection], [detectedLabel || 'Unknown']);
-          }
-        } else {
-          stableFaceFramesRef.current = 0;
-          setFaceDetected(false);
-          setDetectedEmotion('');
-          setDetectionConfidence(0);
-          setDetectedLabel('');
-
-          if (canvasRef.current) {
-            const ctx = canvasRef.current.getContext('2d');
-            if (ctx) {
-              ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-            }
-          }
+        } catch {
+          setError('Face detection is unstable. Keep your face centered and try again.');
+        } finally {
+          isDetectingRef.current = false;
         }
-
-        isDetectingRef.current = false;
       }
       
       animationRef.current = requestAnimationFrame(detectFrame);
@@ -149,28 +154,29 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
   };
 
   const handleCapture = async () => {
-    if (!videoRef.current || !faceDetected) {
-      setError('Please ensure your face is clearly visible');
+    if (!videoRef.current) {
+      setError('Camera is not ready yet. Please wait a moment and try again.');
       return;
     }
 
     try {
+      setError('');
       const descriptors: number[][] = [];
       const emotions: string[] = [];
 
       // Capture multiple frames and average descriptors to reduce one-frame noise.
-      for (let i = 0; i < 5; i += 1) {
+      for (let i = 0; i < 10; i += 1) {
         const detection = await detectFaceWithExpression(videoRef.current, { highAccuracy: true });
         if (detection?.descriptor) {
           descriptors.push(Array.from(detection.descriptor));
           emotions.push(getDominantEmotion(detection.expressions));
         }
 
-        await new Promise((resolve) => window.setTimeout(resolve, 120));
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
       }
 
-      if (descriptors.length < 3) {
-        setError('No face detected. Please try again.');
+      if (descriptors.length < 2) {
+        setError('Face not captured. Keep your face centered, improve lighting, and try again.');
         return;
       }
 
@@ -270,9 +276,9 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onClose, title
         <div className="mt-6 flex gap-3">
           <button
             onClick={handleCapture}
-            disabled={!faceDetected || isLoading}
+            disabled={isLoading}
             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-semibold ${
-              faceDetected && !isLoading
+              !isLoading
                 ? 'bg-blue-500 hover:bg-blue-600 text-white'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}

@@ -31,18 +31,18 @@ export const KPICards: React.FC<KPICardsProps> = ({ items }) => {
           {/* Content */}
           <div className="relative z-10 flex flex-col gap-2">
             {/* Label */}
-            <p className="text-sm font-bold uppercase tracking-widest text-slate-300 group-hover:text-slate-200 transition-colors" style={{ fontFamily: 'BebasNeue', letterSpacing: '0.1em' }}>
+            <p className="text-sm font-bold uppercase text-slate-300 transition-colors group-hover:text-slate-200" style={{ fontFamily: 'BebasNeue', letterSpacing: '0.12em' }}>
               {item.label}
             </p>
 
             {/* Value */}
-            <p className="text-3xl font-black tracking-tight text-white" style={{ fontFamily: 'BebasNeue' }}>
+            <p className="text-3xl font-black text-white" style={{ fontFamily: 'BebasNeue', letterSpacing: '0.05em' }}>
               {item.value}
             </p>
 
             {/* Subtitle */}
             {item.subtitle && (
-              <p className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors leading-tight">{item.subtitle}</p>
+              <p className="text-sm leading-tight tracking-[0.045em] text-slate-400 transition-colors group-hover:text-slate-300">{item.subtitle}</p>
             )}
           </div>
 

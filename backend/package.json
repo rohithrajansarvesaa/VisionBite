@@ -8,7 +8,8 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "seed:food": "node seedFoodItems.js",
-    "seed:user:logini": "node createCustomerUser.js"
+    "seed:user:logini": "node createCustomerUser.js",
+    "seed:user:staff": "node createStaffUser.js"
   },
   "keywords": ["auth", "authentication", "jwt", "mongodb"],
   "author": "",
