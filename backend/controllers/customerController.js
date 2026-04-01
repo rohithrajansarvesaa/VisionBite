@@ -97,6 +97,33 @@ export const getAllCustomers = async (req, res) => {
   }
 };
 
+// Get one customer by ID (without face descriptor)
+export const getCustomerById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await Customer.findById(id).select('-faceDescriptor');
+    if (!customer) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+
+    return res.status(200).json({
+      customer: {
+        id: customer._id,
+        name: customer.name,
+        phone: customer.phone,
+        email: customer.email,
+        preferences: customer.preferences,
+        dietaryRestrictions: customer.dietaryRestrictions,
+        visitCount: customer.visitCount,
+        lastVisit: customer.lastVisit,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 // Recognize customer by face descriptor
 export const recognizeCustomer = async (req, res) => {
   try {

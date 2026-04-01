@@ -41,6 +41,7 @@ export const adminService = {
 export const customerService = {
   enrollCustomer: (data: any) => api.post('/customers/enroll', data),
   getAllCustomers: () => api.get('/customers'),
+  getCustomerById: (id: string) => api.get(`/customers/${id}`),
   recognizeCustomer: (faceDescriptor: number[]) => 
     api.post('/customers/recognize', { faceDescriptor }),
   recognizeCustomersBatch: (faceDescriptors: number[][]) =>

@@ -2,6 +2,7 @@ import express from 'express';
 import {
   enrollCustomer,
   getAllCustomers,
+  getCustomerById,
   matchCustomer,
   matchCustomersBatch,
   recognizeCustomer,
@@ -20,6 +21,7 @@ router.post('/recognize-group', recognizeCustomersBatch);
 router.post('/match', matchCustomer);
 router.post('/match-group', matchCustomersBatch);
 router.post('/recommendations', getRecommendations);
+router.get('/:id', getCustomerById);
 
 // All enrollment/management routes require authentication
 router.use(protect);

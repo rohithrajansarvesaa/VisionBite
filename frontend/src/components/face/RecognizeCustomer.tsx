@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Scan, History, Users } from 'lucide-react';
 import GroupWebcamCapture from './GroupWebcamCapture';
 import { customerService } from '../../services/api';
@@ -29,6 +30,7 @@ interface UnknownFaceForm {
 }
 
 const RecognizeCustomer: React.FC = () => {
+  const navigate = useNavigate();
   const [showCamera, setShowCamera] = useState(false);
   const [recognizing, setRecognizing] = useState(false);
   const [hasNewEnrollments, setHasNewEnrollments] = useState(false);
@@ -238,6 +240,16 @@ const RecognizeCustomer: React.FC = () => {
 
       {groupResults.map((card) => (
         <div key={card.recognition.customer.id} className="rounded-2xl border border-slate-500/30 bg-transparent p-6 shadow-xl shadow-slate-950/10 backdrop-blur-sm">
+          <div className="mb-4 flex justify-end">
+            <button
+              type="button"
+              onClick={() => navigate(`/customer/${card.recognition.customer.id}`)}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+            >
+              Open Customer Page
+            </button>
+          </div>
+
           <div className="mb-6 grid gap-6 md:grid-cols-2">
             <div className="rounded-xl border border-slate-600/50 p-4">
               <h3 className="mb-3 text-2xl font-semibold text-white">Customer Information</h3>
